@@ -23,7 +23,14 @@ The initial image of the table is in flash at `0x2c2d53e0`, and `0x2c2d3d28` lis
 
 The slots are in the order of the image's record list (`kvmap.py`, sorted by key), with all-zero slots in between (slots 6, 19, 26 and 27 of the copy we have). Matching the sizes in order gives every one of the 56 records a slot, and **all 56 crcs are valid**, which is how the layout was checked. The key (the offset in the RAM table) is therefore not stored in the file: it comes from the order, so decoding needs the image. `src/re/kvdecode.py` does it and prints each record; it prints the user's settings, so do not paste its output in an issue.
 
-Records with a count (41 x 68 B, 10 x 169 B, 200 x 88 B, 200 x 26 B) have only their first element in the slot; the others are kept elsewhere (not found yet).
+Records with a count have only their first element in the slot; the others live in separate files in `/user`, and the sizes match exactly:
+
+| Key | Elements | File | Check |
+|---|---|---|---|
+| `0x45c` | 200 x 88 B | `/user/sport.cfg` (17,600 B) | the loader at `0x2c0ea4a0` writes the file in a loop of `0xc8` elements of `0x58` bytes |
+| `0x4f0` | 200 x 26 B | `/user/sport_screen.bin` (5,200 B) | size, and the string is next to the `[KVSCREEN]` code |
+| `0x2a8` | 10 x 169 B | `/user/bluetooth.cfg` (1,690 B) | size, and the file is opened next to the kv code (`0x2c0e9d10`) |
+| `0x7c` | 41 x 68 B (2,788 B) | not on the watch we have | no file of that size in `/user`; `badge.cfg` and `coach_proto.bin` exist in the image but are not on this watch |
 
 Checks against the code: the step goal of key `0x424` (`6000` here) and the layout of the display record read as the code expects. The remaining fields of `0x424` look like `90, 500, 1000, 12, 13, 10, 8, 30`, which fits the log line about duration, calories and floors, but that order is still a hypothesis.
 
@@ -37,7 +44,21 @@ Checks against the code: the step goal of key `0x424` (`6000` here) and the layo
 | `0x9d4` | 136 | `+8` bit 0 enables the World Clock row of the app list | `kv_worldclock_enabled` |
 | `0xf8` | 4 | the app the double press of the side key opens (an index into the 14-window table) | docs/details.md |
 
-The other 46 records are listed by `kvmap.py` without a meaning yet.
+Named from the log strings printed next to the code that reads or writes them (the key is the constant loaded into `r0` before the call to `kv_read`/`kv_write`; the strings are those within 160 bytes of the call):
+
+| Key | Size | What | Evidence |
+|---|---|---|---|
+| `0xd4` | 16 | sleep mode: scheduled on/off, temporary-close switch, repeat, status | `[sleepmode kv] set ... onoff=%d` |
+| `0xe58` | 12 | theater mode: duration, supported, on/off, status | `[theatermode kv] set ...` |
+| `0x174` | 148 | user info (the heart-rate maximum is read from it) | `[D] userinfo hr max:%d` |
+| `0x380` | 36 | heart-rate alert: switch and the high/low limits | `srv heartrate remind set sw,hw:%d,lw:%d,hv:%d,lv:%d` |
+| `0x3f4` | 28 | sleep goal: set time, bed time, wake-up time | `sleepg set_time:%d,bed_time:%d,wakeup_time:%d` |
+| `0x5e0` | 88 | phone / set-up info: connection, OOBE status, screen-off time, brightness | `phoneinfo conn:%d`, `oobeScreenOfftime` |
+| `0x964` | 92 | reminders: master switch | `tmp.remind_switch %d` |
+| `0xb0c` | 38 | account: child-account flag, "together" support code | `child account`, `together support code:%s` |
+| `0xe78` | 48 | list of timers (hypothesis) | `add num:%d, timer:%u` |
+
+Keys seen with no string nearby (so no name): `0x1c`, `0x2a8` apart from its file, `0x520` (written by `applist_store_order`, so the app order), `0x8ec` (read by `applist_get_order`), `0x580`, `0xb48`, `0xbd0`, `0xdbc`, `0xebc`, `0xf2c`, `0xfac`. Some keys are built at run time and were not found by this scan, so the list is not complete.
 
 ## What it is good for
 

@@ -10,6 +10,11 @@ Records with a count keep their elements outside the file. Values are the user's
 import struct, sys
 BASE = 0x2c080000; IMG = 0x2c2d53e0 - BASE; LST = 0x2c2d3d28 - BASE
 SLOT = 0x200
+# names from docs/settings.md (log strings near the readers); the rest stay unnamed
+NAMES = {0xf8: "double-press app", 0x110: "display", 0x248: "vibration", 0x424: "daily goals", 0x9d4: "world clock",
+         0xd4: "sleep mode", 0xe58: "theater mode", 0x174: "user info", 0x380: "heart-rate alert", 0x3f4: "sleep goal",
+         0x5e0: "phone info", 0x964: "reminders", 0xb0c: "account", 0xe78: "timers?", 0x45c: "sport.cfg", 0x4f0: "sport_screen.bin",
+         0x2a8: "bluetooth.cfg", 0x520: "app order"}
 
 def crc16(data, c=0xFFFF):
     for b in data:
@@ -42,7 +47,7 @@ def main(argv):
             while j < len(recs) and recs[j][1] != size: j += 1
             if j < len(recs): key = recs[j][0]; ri = j + 1
         ok = crc16(data) == crc; n += 1; bad += not ok
-        print("slot %#06x  key %-6s size %4d count %-3s crc %s  %s" % (k, "%#x" % key if key is not None else "?", size, cnt or "-", "ok " if ok else "BAD", data[:24].hex(" ")))
+        print("slot %#06x  key %-6s size %4d count %-3s crc %s  %-17s %s" % (k, "%#x" % key if key is not None else "?", size, cnt or "-", "ok " if ok else "BAD", NAMES.get(key, ""), data[:24].hex(" ")))
     print("%d records, %d with a bad crc" % (n, bad))
 
 if __name__ == "__main__":

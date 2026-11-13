@@ -10,7 +10,22 @@ The initial image of the table is in flash at `0x2c2d53e0`, and `0x2c2d3d28` lis
 
 ## Seen in the live file
 
-`/user/kvdata.bin` is 30,242 bytes: the table first (the headers; the version `02 00` at the start), then the data. The packing of the data after the table is **not decoded**: the records do not follow the table's offsets (a read of the key `0x110` at its table offset gives zeros).
+`/user/kvdata.bin` is 30,242 bytes: a sequence of **0x200-byte slots, one record per slot**. A slot is a 0x14-byte header and then the data (the rest of the slot is zero):
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | u16 | version / loaded index (the first slot's `2` is the table version) |
+| 2 | u16 | crc: **CRC-16/CCITT-FALSE** (poly 0x1021, init 0xffff, check value `0x29b1`) over the data bytes |
+| 4 | u16 | unknown (0 in all slots seen) |
+| 6 | u16 | element count (0 for plain records) |
+| 8 | u32 | data size, equal to the record's size in the image |
+| 0xc, 0x10 | 2 x u32 | zero or a code pointer, not data |
+
+The slots are in the order of the image's record list (`kvmap.py`, sorted by key), with all-zero slots in between (slots 6, 19, 26 and 27 of the copy we have). Matching the sizes in order gives every one of the 56 records a slot, and **all 56 crcs are valid**, which is how the layout was checked. The key (the offset in the RAM table) is therefore not stored in the file: it comes from the order, so decoding needs the image. `src/re/kvdecode.py` does it and prints each record; it prints the user's settings, so do not paste its output in an issue.
+
+Records with a count (41 x 68 B, 10 x 169 B, 200 x 88 B, 200 x 26 B) have only their first element in the slot; the others are kept elsewhere (not found yet).
+
+Checks against the code: the step goal of key `0x424` (`6000` here) and the layout of the display record read as the code expects. The remaining fields of `0x424` look like `90, 500, 1000, 12, 13, 10, 8, 30`, which fits the log line about duration, calories and floors, but that order is still a hypothesis.
 
 ## Records identified (from the code that reads them)
 
@@ -26,4 +41,4 @@ The other 46 records are listed by `kvmap.py` without a meaning yet.
 
 ## What it is good for
 
-Writing a record from an app (`kv_write`) changes the watch's real settings, so it would let an app set the brightness, the vibration or the goal. It is also a way to break the watch: the length must match, the version must stay, and the crc16 is kept by the write function. Reads are safe; **writes are untested on a watch.**
+Writing a record from an app (`kv_write`) changes the watch's real settings, so it would let an app set the brightness, the vibration or the goal. It is also a way to break the watch: the length must match, the version must stay, and the crc16 is kept by the write function. Reads are safe; **writes are untested on a watch.** Editing the file directly (a slot's data plus its crc) is possible now that the crc is known, but the firmware also checks the table version and the watch rewrites the file itself, so this is untested too.

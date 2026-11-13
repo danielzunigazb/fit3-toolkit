@@ -19,6 +19,17 @@ Writing your own reply to a notification ([replies.md](replies.md)): **works on 
 | `f3x_install.py remove` and `--force`, an update in place, a damaged file refused by the hub, an image near the 32 kB limit | PC and emulator; **open** on a watch |
 | Hub built with `--no-native-transitions` (apps inside the hub's window) | emulator |
 
+## Launcher, health, Album picture, research (2026-11-12)
+
+| What | State |
+|---|---|
+| Launcher in the Calculator entry (`--launcher`): header, favourites dock, *My apps*, long-press sheet, build flashed from the PC with upload, read-back and update | watch (one watch; the author reported it works) and emulator (38 checks) |
+| Health app (steps ring, heart rate, kcal, km), reading the firmware's own block and `hr-point.rec` | emulator (12 checks, test data); the file formats were read from files pulled off a watch; **open** as a long run on a watch |
+| A picture of your own on the Album face (raw RGB565 file under `/user/wf/album`, entry in `wf_special.cfg`, a restart) and a plain amber one | watch. The serial file service **silently drops writes under `/user/wf/`** for other files |
+| Settings store `kvdata.bin`: slot layout and crc | PC: all 56 crcs of one live file are valid. Writing a record is **open** (not tried) |
+| Bluetooth receive path and frame header | read from the firmware only; **no frame was captured**, nothing was sent |
+| Own-OS study | read only; nothing flashed |
+
 ## Build and flash
 
 | What | State |

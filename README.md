@@ -30,11 +30,24 @@ PC over Bluetooth. Nothing of Samsung's is in this repository. The apps look and
   </tr>
 </table>
 
+<table width="100%">
+  <tr>
+    <td width="50%" align="center"><img src="docs/images/launcher-home.png" width="60%"><br><sub>Launcher (<code>--launcher</code>): header, favourites, <i>My apps</i></sub></td>
+    <td width="50%" align="center"><img src="docs/images/app-health.png" width="60%"><br><sub>Health app: steps, heart rate, kcal, km</sub></td>
+  </tr>
+</table>
+<p align="center"><sub>The two pictures above are the real firmware's code run in the emulator with test data, not photos of a watch. UI texts are still in Spanish.</sub></p>
+
 ## Features
 
 - **Application Hub**: one entry of the stock app list becomes a native-style list of your apps. Open one and it slides in like a stock app; swipe back to leave.
 - **Install apps without flashing**: `.f3x` files go to the watch over Bluetooth in about a second. A long press on an app's row removes it.
 - **Reply keyboard** (a firmware patch, not an app): a *Write reply* row on the page of quick replies of a notification opens a keyboard, QWERTY or T9 multi-tap, with the letters of your language; the text goes to the phone as the reply. Layouts for 24 Latin-script languages, chosen at build time and followed from the watch's system language. [docs/replies.md](docs/replies.md)
+- **Launcher** (`--launcher`): the entry becomes a home screen with the time, battery, date, steps and heart rate in a header, a dock of favourite apps you choose with a long press (kept in `/user/launcher.cfg`) and *My apps* below it; the stock tiles stay reachable.
+- **A small design system** ([`src/watch/ds.h`](src/watch/ds.h)): one warm palette, a digits-only display font and a T9 keypad, so new apps look alike.
+- **Health app**: steps, heart rate, kcal and km read from where the firmware keeps them. [docs/health.md](docs/health.md)
+- **Your own picture on the Album face**, and notes on the other faces. [docs/watchfaces.md](docs/watchfaces.md)
+- **Research notes**: [hardware](docs/hardware.md), [what replacing Samsung's software would take](docs/own-os.md), [the settings store](docs/settings.md) with a decoder, [the Bluetooth receive path](docs/ble-rx-path.md) and a tool that names firmware functions from their strings.
 - **Demo apps** you can use or copy: *Tennis Score*, *Counter*, *Dice*, *Mars Production*. Each can be built into the firmware or installed later.
 - **Tools**: build and validate firmware packages, flash them, install apps, an emulator that runs the real firmware's functions on your PC, decoders for the watch's fonts and images.
 
@@ -86,19 +99,28 @@ src/
 │   ├── hub.c             the Application Hub: window, list, loader of installed apps
 │   ├── kbd.c, kblang.py  the reply keyboard and its layouts per language
 │   ├── ui.h              shared header: firmware functions, colours, fonts, widgets
+│   ├── ds.h, t9.h        the design system (palette, fonts) and the T9 keypad
+│   ├── launcher.c        the launcher (--launcher)
+│   ├── health.h          where the firmware keeps steps, heart rate, kcal and km
 │   └── apps/             demo apps (Tennis Score, Counter, Dice, Mars Production) and the guide to writing your own
 ├── f3x/                  the .f3x app format and its builder
 ├── device/               talk to the watch: flash a package, install apps, copy fonts and images off it
 ├── firmware/             read, patch, validate and rebuild firmware packages
 ├── emu/                  run functions of the real firmware on the PC; screenshots; most of the tests
 ├── assets/               decoders for fonts, images and language packs; icon generator
-└── re/                   the Ghidra pipeline used to study the firmware
+└── re/                   the Ghidra pipeline, and small tools: autoname.py, kvmap.py, kvdecode.py, sap_frame.py
 docs/
 ├── howto.md              the full procedure, step by step
 ├── status.md             what was tried on a watch, and what was not
 ├── f3x.md                the .f3x file format
 ├── replies.md            writing your own reply to a notification (keyboard, QWERTY and T9)
 ├── details.md            how the firmware works: addresses, windows, fonts
+├── hardware.md           the chips and buses the firmware names
+├── health.md             the health data files and where the live numbers are
+├── watchfaces.md         the watch faces, the Album picture
+├── settings.md           the settings store (kvdata.bin): records, layout, crc
+├── ble-rx-path.md        the Bluetooth receive path and the frame header
+├── own-os.md             a study of running our own code instead of Samsung's
 ├── firmware.md           the package format
 ├── protocol.md           the Bluetooth file-transfer protocol
 ├── assets.md             the watch's fonts and image packs

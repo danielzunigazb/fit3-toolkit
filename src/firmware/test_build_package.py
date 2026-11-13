@@ -134,4 +134,13 @@ good("... and nothing else in the main image changes")
 refuses("a reply hook outside the loader", reply_hook={"main": 0x2c3a8001, "refresh": HOOK["refresh"]})
 refuses("a reply hook that is not Thumb", reply_hook={"main": HOOK["main"] & ~1, "refresh": HOOK["refresh"]})
 refuses("a reply hook without the refresh entry", reply_hook={"main": HOOK["main"]})
+
+# 6. full notifications: skip only the stock 11-line clamp; the surrounding object is already scrollable
+site, stock_bytes, patched = bp.FULL_NOTICE
+p = build("full-notifications.bin", full_notifications=True); full = p.raw(fwd.MAIN)
+assert sm[bp.at(site):bp.at(site) + 2] == stock_bytes and full[bp.at(site):bp.at(site) + 2] == patched
+base = build("short-notifications.bin").raw(fwd.MAIN)
+diff = [i for i in range(len(full)) if full[i] != base[i] and i >= 0x1010]
+assert diff and all(bp.at(site) <= i < bp.at(site) + 2 for i in diff), [hex(bp.BASE + i) for i in diff]
+good("--full-notifications changes only the 11-line clamp branch in the notification detail builder")
 print("%d checks passed" % ok)

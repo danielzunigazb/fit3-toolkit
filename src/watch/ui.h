@@ -20,6 +20,7 @@ typedef struct lv_obj lv_obj_t; typedef struct lv_timer lv_timer_t; typedef stru
 #define lv_obj_align_to(o, base, align, x, y) F(0x2c27908c, void, (lv_obj_t *, lv_obj_t *, u32, i32, i32))(o, base, align, x, y)
 #define ALIGN_OUT_RIGHT_MID 0x14
 #define lv_obj_clean(o)             F(0x2c27b1e8, void, (lv_obj_t *))(o)                 /* deletes all children */
+#define lv_obj_get_scroll_y(o)      F(0x2c27b6c6, i32, (lv_obj_t *))(o)
 #define lv_obj_scroll_to_y(o, y, anim) F(0x2c27be64, void, (lv_obj_t *, i32, u32))(o, y, anim)
 #define lv_obj_set_scrollbar_mode(o, m) F(0x2c27b5c8, void, (lv_obj_t *, u32))(o, m)       /* 0 = off */
 #define lv_obj_add_event_cb(o, cb, code, ud) F(0x2c27d9cc, void *, (lv_obj_t *, void (*)(lv_event_t *), u32, void *))(o, cb, code, ud)
@@ -27,6 +28,8 @@ typedef struct lv_obj lv_obj_t; typedef struct lv_timer lv_timer_t; typedef stru
 #define lv_event_get_target(e)      F(0x2c27d980, lv_obj_t *, (lv_event_t *))(e)
 #define lv_event_get_user_data(e)   F(0x2c27d994, void *, (lv_event_t *))(e)
 #define lv_label_create(p)          F(0x2c28de90, lv_obj_t *, (lv_obj_t *))(p)
+#define text_id_get_font(id)        F(0x2c2134fc, const void *, (u32))(id)               /* the font and the string of a text of the language pack, as the stock app list uses them */
+#define text_id_get_string(id)      F(0x2c2138cc, const char *, (u32))(id)
 #define lv_label_set_text(o, s)     F(0x2c28e98c, void, (lv_obj_t *, const char *))(o, s)
 #define lv_img_create(p)            F(0x2c2905ac, lv_obj_t *, (lv_obj_t *))(p)
 #define lv_img_set_src(o, d)        F(0x2c29064c, void, (lv_obj_t *, const void *))(o, d)
@@ -41,11 +44,20 @@ typedef struct lv_obj lv_obj_t; typedef struct lv_timer lv_timer_t; typedef stru
 #define f_open(path, mode)          F(0x2c0c575c, i32, (const char *, const char *))(path, mode)
 #define f_read(fd, buf, n)          F(0x2c142dcc, i32, (i32, void *, u32))(fd, buf, n)
 #define f_write(fd, buf, n)         F(0x2c142ee0, i32, (i32, const void *, u32))(fd, buf, n)
+#define kv_read(key, buf, len, idx) F(0x2c0ea3c8, u32, (u32, void *, u32, u32))(key, buf, len, idx)   /* a record of the settings store (the length must be the record's own) */
+#define fs_opendir(p)               F(0x2c143428, i32, (const char *))(p)                 /* a handle (negative: error; only 5 at once) */
+#define fs_readdir(h, pent)         F(0x2c143680, u32, (i32, u8 **))(h, pent)             /* 0: *pent is the entry, its name at +0xb; non-zero or *pent == 0: the end */
+#define fs_closedir(h)              F(0x2c143530, u32, (i32))(h)
+#define fs_stat(p, buf)             F(0x2c1432a8, u32, (const char *, void *))(p, buf)    /* 0: ok; the size is the u32 at buf + 0x20 (buf: 0x60 bytes) */
+#define f_size(fd)                  F(0x2c143144, u32, (i32))(fd)                         /* fs_file_size: the low word of the 64-bit size */
+#define f_seek(fd, off, wh)         F(0x2c1430c4, long long, (i32, long long, i32))(fd, off, wh)    /* wh 0: from the start */
 #define f_close(fd)                 F(0x2c142c24, u32, (i32))(fd)
 #define mkdir_p(path)              F(0x2c1435e0, u32, (const char *))(path)           /* creates every missing directory of the path; 0 = ok */
 #define motor_once(id, flag)        F(0x2c1423f8, u32, (u32, i32))(id, flag)         /* flag != 0: respects the user's vibration setting */
 #define ui_gesture_consume()        F(0x2c224f04, void, (void))()
 #define wm_open(op, id, arg, anim)  F(0x2c225ddc, void, (i32, i32, i32, i32))(op, id, arg, anim)
+#define rtc_get_time(t)             F(0x2c0cb8f4, void, (i32 *))(t)                      /* nine ints: [1] s [2] min [3] h [4] day [5] month 1..12 [6] year (four digits) */
+#define power_ctrl(type, out, n)    F(0x2c0a9e24, i32, (u32, u32 *, u32))(type, out, n)  /* type 1: the battery percentage the firmware keeps (a plain read) */
 #define wm_set_current(id)          F(0x2c224d30, void, (u16))(id)
 #define set_bg_color(o, c)          F(0x2c27d53c, void, (lv_obj_t *, u16, u32))(o, c, 0)
 #define set_bg_opa(o, v)            F(0x2c27d55c, void, (lv_obj_t *, u32, u32))(o, v, 0)
@@ -67,17 +79,20 @@ typedef struct lv_obj lv_obj_t; typedef struct lv_timer lv_timer_t; typedef stru
 #define EV_DELETE 33
 #define ALIGN_LEFT 0
 #define ALIGN_CENTER 2
+#define ALIGN_RIGHT 3
 #define BACK_ANIM 0x14                                                  /* 4th argument of wm_open for "back": the slide the stock windows use (docs/details.md) */
 #define SCREEN_W 256
 #define SCREEN_H 402
 
 #define ROBOTO_MEDIUM(i) (*(const void *const *)(0x2010b0e0 + 4 * (i)))   /* docs/details.md: 0:86 1:48 2:44 3:40 4:36 5:32 6:30 7:28 8:24 9:23 10:20 */
 #define FT_HUGE ROBOTO_MEDIUM(0)
+#define FT_CLOCK ROBOTO_MEDIUM(1)
 #define FT_POINT ROBOTO_MEDIUM(2)
 #define FT_GAMES ROBOTO_MEDIUM(4)
 #define FT_NAME ROBOTO_MEDIUM(5)
 #define FT_BTN ROBOTO_MEDIUM(7)
 #define FT_SMALL ROBOTO_MEDIUM(8)
+#define FT_TINY ROBOTO_MEDIUM(10)
 
 /* palette (RGB565; docs/details.md for the UI colours, the players' colours are our choice) */
 #define C_BLACK 0x0000

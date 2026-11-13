@@ -84,8 +84,8 @@ def pack(px, bpp):
     return bytes(out)
 
 
-def build(ttf, size, extra="", bpp=2, polish=True):
-    cps = charset(extra, polish); missing = [chr(c) for c in cps if c not in ttf_codepoints(ttf)]
+def build(ttf, size, extra="", bpp=2, polish=True, only=None):
+    cps = sorted({ord(c) for c in only}) if only else charset(extra, polish); missing = [chr(c) for c in cps if c not in ttf_codepoints(ttf)]
     if missing: raise SystemExit("%s has no glyph for: %s" % (os.path.basename(ttf), " ".join(missing)))
     asc, desc, gl = render(ttf, size, cps, bpp); bitmap = bytearray(b"\0"); idx = [0]    # byte 0 belongs to glyph 0
     for g in gl[1:]:

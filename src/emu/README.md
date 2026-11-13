@@ -60,6 +60,7 @@ python3 -I src/firmware/fwx.py local/firmware/<name>.bin main local/re/main-<nam
 | `test_f3x.py` | installed `.f3x` apps: good, damaged, for another firmware, bad magic; removal | `--hub counter --no-native-transitions` | `main-hubtest.bin` (and `main-hubempty.bin`) |
 | `test_host.py` | the default mode: each app is a window of its own (id `0x10`); plays the window manager's part | `--hub counter,dice` | `main-hubhost.bin` |
 | `test_kbd.py` | the reply keyboard: the patched call site, the extra row, typing, send | `--hub counter,dice --reply-keyboard` | `main-reply.bin` |
+| `test_launcher.py` | the launcher: header, favourites (fix, release, six at most, saved), our apps, the watch's apps, opening, the sheet, removal, the empty section; writes pictures | `--hub tennis,counter,dice,mars --launcher` (and with `--no-native-transitions`, and `--hub none`) | `main-launcher.bin`, `main-launcherc.bin`, `main-launcher0.bin` |
 | `test_font.py` | the generated Roboto font with the Polish letters, rendered by the firmware's LVGL | none | `main-stock.bin` |
 | `test_icon.py` | the app-list icon of the replaced entry | `--app tennis` | `main-tennis.bin` |
 | `test_slots.py` | builds a package for every replaceable app-list entry and runs the window test on each (minutes; run it with the system `python3 -I`) | (builds its own) | |

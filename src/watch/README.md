@@ -8,6 +8,7 @@ All firmware addresses used are in `docs/symbols.csv`.
 |---|---|
 | `hub.c` | the window that replaces one entry of the app list: **single-app mode** (one app owns the window) or the **Application Hub** (a native-style list; a tap opens an app, the back gesture closes it). The window manager's answers (key policy, swipe queries) and the back gesture live here, once, for every app. |
 | `ui.h` | what the code shares: the firmware functions we call, colours, fonts, text helpers, small file helpers (`blob_save`/`blob_load`), widgets (`mk_box`, `mk_text`, `mk_pill`), and the `App` interface. |
+| `launcher.c`, `ds.h` | the launcher (`--launcher`) and the design system it is drawn with: tokens (colour, type, space, radius, haptics) and components (tile, section, pill, sheet). |
 | `kblang.py` | the keyboard layouts of the reply keyboard per system language (`--kb-lang`), and the header they become. |
 | `kbd.c` | the reply keyboard and its hook (included when `--reply-keyboard` is given; [docs/replies.md](../../docs/replies.md)). |
 | [`apps/`](apps/README.md) | the demo apps (Tennis Score, Counter, Dice, Mars Production) and the guide to writing your own. `counter.c` is the smallest complete one. |
@@ -21,6 +22,22 @@ All firmware addresses used are in `docs/symbols.csv`.
 By default (`--hub`) every app is a window of its own, id `0x10`: the hub asks the window manager for `wm_open(2, 0x10, arg, 0xf)` and the manager slides the app in like a stock one (details: docs/details.md,
 section 2). `--no-native-transitions` builds the fallback: the app is a container inside the hub's window, without the slide. In both modes the back gesture goes to the app first (an overlay may close), then
 the app closes. A long press on the row of an **installed** app opens a sheet that removes it (Remove asks twice; the slot is overwritten with the 8-byte tombstone `F3X-GONE`).
+
+## The launcher (`--launcher`)
+
+`--hub A,B --launcher` replaces the hub's list by a launcher (`launcher.c`), one scrolling page:
+
+- **status header**: the time (24 h, from the RTC), the battery percentage and the date, refreshed once a second by a timer that is deleted with the page;
+- **favourites**: up to six apps the user fixed there, a dock of icons (three per row);
+- **Mis apps**: the built-in apps, then the installed `.f3x` files, two per row with their names;
+- **Del reloj**: the watch's own apps, read from the firmware's app-list table (`0x2c30021c`: window, icon image ID, name text ID), all but the entry this window replaces.
+
+A tap opens the app: ours as the hub does, a stock one with `wm_open(2, window, 0, 0xf)`, the call the stock list makes. A long press opens a sheet: *Fijar arriba* / *Soltar* (the favourites, 16 bytes in
+`/user/launcher.cfg`, written only when they change) and, for an installed app, *Quitar* (two taps). The back gesture closes the sheet, then leaves. Assign the watch's double press of the side key to the
+replaced entry and the launcher is one gesture away from anywhere.
+
+Everything is drawn with `ds.h`, the design system in code (tokens and components; described in `DESIGN.md` next to the toolkit). Our texts are Spanish without accents (the stock fonts are ASCII); a stock
+app's name comes from the language pack with its own font. `src/emu/test_launcher.py` checks and renders the page.
 
 ## Build modes
 

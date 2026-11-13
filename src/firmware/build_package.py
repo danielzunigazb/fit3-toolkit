@@ -60,6 +60,7 @@ def encode_bl(src, dst):
 
 REPLY_MAIN = (0x2c1d0f92, bytes.fromhex("fff71dbd"))   # b.w 0x2c1d09d0 (tail call): the page of quick replies that the reply icon opens (docs/details.md section 8)
 REPLY_REFRESH = (0x2c1d2598, bytes.fromhex("fef7fcfa"))   # bl 0x2c1d0b94 in the notice window's event function: the page rebuilt when the phone sends new replies (event 0x42)
+FULL_NOTICE = (0x2c1d21c0, bytes.fromhex("07db"), bytes.fromhex("07e0"))  # blt -> b: keep the label's natural height instead of clamping it to 11 lines and enabling dots
 
 
 def _fn(v): return (v & 0x00ffffff) + 0x2c000000 & ~1 if v else 0     # a record field -> the function's address (the 0x0c.. flash alias removed, Thumb bit cleared)
@@ -98,7 +99,7 @@ def check_stock(p):
     return raw
 
 
-def build(stock, out, loader, takeover, loader_addr=FREE_START, label="Tennis", validate=True, quiet=False, icon=None, slot=0x2b, languages="en", force_slot=False, bluetooth_patches=True, reply_hook=None):
+def build(stock, out, loader, takeover, loader_addr=FREE_START, label="Tennis", validate=True, quiet=False, icon=None, slot=0x2b, languages="en", force_slot=False, bluetooth_patches=True, reply_hook=None, full_notifications=False):
     """reply_hook = {"main": Thumb address, "refresh": Thumb address} of reply_page and reply_refresh inside `loader` (the reply keyboard): the two places that build the stock page of quick replies are pointed at them. takeover = {"create": Thumb address, "event": Thumb address} of the two window functions inside `loader`"""
     log = (lambda *a: None) if quiet else print
     new_label = label.encode("ascii") + b"\0"; old_label = b"World Clock\0"
@@ -137,6 +138,10 @@ def build(stock, out, loader, takeover, loader_addr=FREE_START, label="Tennis", 
             assert orig[at(site):at(site) + 4] == stock, "the reply-page site %#x does not hold %s (another version?)" % (site, stock.hex())
             assert loader_addr <= reply_hook[key] & ~1 < lend and reply_hook[key] & 1, "reply hook %s %#x is not a Thumb address inside the loader" % (key, reply_hook[key])
             raw[at(site):at(site) + 4] = enc(site, reply_hook[key] & ~1)
+    if full_notifications:
+        site, stock_bytes, patched = FULL_NOTICE
+        assert orig[at(site):at(site) + len(stock_bytes)] == stock_bytes, "full-notification site %#x does not hold %s (another version?)" % (site, stock_bytes.hex())
+        raw[at(site):at(site) + len(patched)] = patched
     # the other window functions would run on the stock state that we never create: make them no-ops (a function nobody else points at, checked against all 166 records)
     refs = {}
     for w in range(WINDOW_COUNT):
@@ -169,6 +174,7 @@ def build(stock, out, loader, takeover, loader_addr=FREE_START, label="Tennis", 
     log("Bluetooth patches: %s; loader %d bytes at %#x..%#x; take-over of %s (window %#x, list row %d): %s" % ("%d (the watch is open to anyone in range)" % len(SPP_PATCHES) if bluetooth_patches else "none (stock Bluetooth behaviour)", len(loader), loader_addr, lend, sl["name"], sl["window"], sl["row"],
         ", ".join("%s %#x -> b.w %#x" % (k, sl[k], v & ~1) for k, v in takeover.items())))
     if reply_hook is not None: log("reply keyboard: %#x -> %#x (page of the reply icon), %#x -> %#x (refresh)" % (REPLY_MAIN[0], reply_hook["main"] & ~1, REPLY_REFRESH[0], reply_hook["refresh"] & ~1))
+    if full_notifications: log("full notifications: label height is no longer clamped to 11 lines at %#x; the stock detail container scrolls" % FULL_NOTICE[0])
     log("label -> %r; changed language files: %s" % (label, ", ".join("%s (x%d)" % c for c in changed)))
     log("wrote", out, os.path.getsize(out), "bytes")
     if validate:

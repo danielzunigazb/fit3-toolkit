@@ -19,7 +19,11 @@ KINDS = {"tennis": ((46, 128, 222), (30, 93, 182)),     # court blue
          "hub": ((64, 196, 150), (28, 140, 108)),       # green
          "counter": ((250, 168, 44), (226, 118, 22)),   # orange
          "dice": ((154, 104, 232), (104, 60, 190)),     # purple
-         "mars": ((214, 96, 52), (150, 52, 30))}        # rust red
+         "mars": ((214, 96, 52), (150, 52, 30)),        # rust red
+         "health": ((240, 98, 96), (190, 52, 66)),      # coral
+         "fan": ((246, 165, 32), (205, 125, 8)),        # amber
+         "music": ((40, 200, 100), (20, 140, 72)),      # green
+         "notes": ((236, 196, 74), (196, 146, 30))}     # honey
 WHITE = (255, 255, 255)
 
 
@@ -64,7 +68,34 @@ def _glyph_mars(x, y, rgb):
     return np.where(patch[..., None], np.array((86, 190, 98), float), rgb)
 
 
-GLYPHS = {"mars": _glyph_mars, "tennis": _glyph_tennis, "hub": _glyph_hub, "counter": _glyph_counter, "dice": _glyph_dice}
+def _glyph_health(x, y, rgb):
+    heart = ((x - 24.5) ** 2 + (y - 27.0) ** 2 <= 10.0 ** 2) | ((x - 39.5) ** 2 + (y - 27.0) ** 2 <= 10.0 ** 2)      # a cream heart: two lobes and a point
+    heart |= (y >= 27.0) & (y <= 47.5) & (np.abs(x - 32.0) <= (47.5 - y) * 0.98 + 0.4) & (np.abs(x - 32.0) <= 17.0 - (y - 27.0) * 0.83)
+    return np.where(heart[..., None], np.array((255, 242, 222), float), rgb)
+
+
+def _glyph_fan(x, y, rgb):
+    m = np.zeros(x.shape, bool)                                                  # three agents: a triangle of cream dots joined by a bar
+    for cx, cy in ((32.0, 22.0), (21.0, 41.0), (43.0, 41.0)): m |= (x - cx) ** 2 + (y - cy) ** 2 <= 6.5 ** 2
+    m |= _rr(x, y, 32, 41, 11.0, 1.8, 0.9)
+    return np.where(m[..., None], np.array((255, 242, 222), float), rgb)
+
+
+def _glyph_music(x, y, rgb):
+    m = np.zeros(x.shape, bool)                                                  # three cream arcs, the sound
+    for r, w in ((10.0, 2.6), (17.0, 2.8), (24.0, 3.0)): m |= (np.abs(np.hypot(x - 32.0, y - 46.0) - r) <= w) & (y <= 45.0) & (np.abs(x - 32.0) <= (46.0 - y) * 1.1 + 4.0)
+    return np.where(m[..., None], np.array((255, 242, 222), float), rgb)
+
+
+def _glyph_notes(x, y, rgb):
+    page = _rr(x, y, 32, 32, 13.0, 17.0, 3.0)                                    # a cream page with three lines of text
+    rgb = np.where(page[..., None], np.array((255, 242, 222), float), rgb)
+    lines = np.zeros(x.shape, bool)
+    for ly in (24.0, 31.0, 38.0): lines |= _rr(x, y, 32, ly, 7.5, 1.3, 0.6)
+    return np.where(lines[..., None], np.array(KINDS["notes"][1], float), rgb)
+
+
+GLYPHS = {"fan": _glyph_fan, "music": _glyph_music, "notes": _glyph_notes, "health": _glyph_health, "mars": _glyph_mars, "tennis": _glyph_tennis, "hub": _glyph_hub, "counter": _glyph_counter, "dice": _glyph_dice}
 
 
 def draw(kind="tennis", size=SIZE):

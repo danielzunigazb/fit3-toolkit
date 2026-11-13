@@ -18,6 +18,7 @@ def main():
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--app", choices=sorted(gen.APPS), help="one app owns the window (default: tennis)")
     g.add_argument("--hub", help="comma-separated apps, in the order of the list: the window becomes the Application Hub (e.g. tennis,counter,dice; \"none\" for a hub with installed apps only)")
+    ap.add_argument("--launcher", action="store_true", help="with --hub: the page is the launcher: time, date and battery, a dock of favourites, our apps and the watch's own apps (Spanish texts; src/watch/README.md)")
     ap.add_argument("--no-native-transitions", action="store_true", help="a hub that opens an app inside its own window (no slide animation) instead of as a window of its own (the default; docs/details.md section 2)")
     ap.add_argument("--no-install", action="store_true", help="a hub without the loader of installable .f3x apps (saves about 1 kB; without the Bluetooth patches nothing can be installed anyway)")
     ap.add_argument("--label", help="name in the app list (replaces the entry's name; longer than 11 characters wraps onto two lines). Default: the app's name, or Application Hub")
@@ -26,13 +27,17 @@ def main():
     ap.add_argument("--force-slot", action="store_true", help="allow Settings (it would lock you out of the settings: do not)")
     ap.add_argument("--languages", choices=("en", "all"), default="en", help="rename the entry in the English files only, or in every language file (untested outside English)")
     ap.add_argument("--reply-keyboard", action="store_true", help="add a \"Write reply\" row to the page of quick replies of a notification: a keyboard (QWERTY or multi-tap, with Polish letters) whose text goes to the phone (docs/replies.md)")
+    ap.add_argument("--full-notifications", action="store_true", help="show the complete notification body with vertical scrolling instead of clamping it to 11 lines with an ellipsis")
     ap.add_argument("--kb-lang", default="en", help="the keyboard layouts to build in, comma-separated (default en): %s, or all. With more than one the layout follows the watch's system language (the first is the fallback) and a tap on the count at the top of the keyboard switches it" % ", ".join(kblang.LANGS))
     ap.add_argument("--kb-font", help="a TTF with Latin glyphs for the keyboard (default: Roboto Medium found with fc-match; Apache-2.0, not stored in the repository)")
     ap.add_argument("--no-icon", action="store_true", help="keep the stock icon")
     ap.add_argument("--no-bluetooth-patches", action="store_true", help="leave the watch's Bluetooth as stock: nobody in range can connect, and you cannot flash it from here again without a reset (use for the final package)")
     a = ap.parse_args()
+    if not os.path.isfile(a.stock) and os.path.isfile(os.path.join(HERE, "..", "local", "firmware", a.stock)):
+        a.stock = os.path.join(HERE, "..", "local", "firmware", a.stock)  # a bare name such as stock-aza3.bin: look in local/firmware/
     if a.list_slots: sys.exit(subprocess.call([sys.executable, "-I", os.path.join(HERE, "firmware", "build_package.py"), a.stock, "--list-slots"]))
     if not a.out: ap.error("out is required")
+    if a.launcher and a.hub is None: ap.error("--launcher needs --hub (the apps of its grid, or \"none\")")
     p = fwd.Package.load(a.stock); raw = build_package.check_stock(p); en = next(build_package.lvlang.Lang(p.raw(k)) for k in p.paths() if k.endswith("/language_en.res"))
     sl = build_package.find_slot(build_package.slot_table(raw, en), a.slot)
     hub = a.hub is not None; apps = ([x.strip() for x in a.hub.split(",")] if a.hub.strip() not in ("", "none") else []) if hub else [a.app or "tennis"]
@@ -45,11 +50,12 @@ def main():
         kb_ttf = a.kb_font or subprocess.run(["fc-match", "-f", "%{file}", "Roboto:medium"], capture_output=True, text=True).stdout
         if not kb_ttf or not os.path.isfile(kb_ttf) or "oboto" not in os.path.basename(kb_ttf) and not a.kb_font: sys.exit("--reply-keyboard needs a Roboto TTF with the Polish letters: install Roboto or pass --kb-font")
     work = tempfile.mkdtemp(prefix="fit3_"); loader = os.path.join(work, "loader.bin")
-    syms = build_loader.build(os.path.join(HERE, "watch", "hub.c"), loader, quiet=True, defines=["WINDOW_ID=%#x" % sl["window"]], include_dirs=[gen.generate(apps, hub, os.path.join(work, "gen"), install, hub and not a.no_native_transitions, kb_ttf, kb_langs)])
-    label = a.label or ("Application Hub" if hub else {"tennis": "Tennis Score", "counter": "Counter", "dice": "Dice", "mars": "Mars Production"}[apps[0]])
-    icon = None if a.no_icon else mkicon.encode(*mkicon.draw("hub" if hub else apps[0]))
+    syms = build_loader.build(os.path.join(HERE, "watch", "hub.c"), loader, quiet=True, defines=["WINDOW_ID=%#x" % sl["window"]], include_dirs=[gen.generate(apps, hub, os.path.join(work, "gen"), install, hub and not a.no_native_transitions, kb_ttf, kb_langs, a.launcher)])
+    label = a.label or ("Launcher" if a.launcher else "Application Hub" if hub else {"tennis": "Tennis Score", "counter": "Counter", "dice": "Dice", "mars": "Mars Production"}.get(apps[0], apps[0].title()))
+    icon = None if a.no_icon else mkicon.encode(*mkicon.draw("hub" if hub else apps[0] if apps[0] in mkicon.KINDS else "counter"))
     build_package.build(a.stock, a.out, open(loader, "rb").read(), label=label, icon=icon, slot=sl["window"], languages=a.languages, force_slot=a.force_slot, bluetooth_patches=not a.no_bluetooth_patches,
-                        takeover={"create": syms["world_create"] | 1, "event": syms["world_event"] | 1}, reply_hook={"main": syms["reply_page"] | 1, "refresh": syms["reply_refresh"] | 1} if kb_ttf else None)
+                        takeover={"create": syms["world_create"] | 1, "event": syms["world_event"] | 1}, reply_hook={"main": syms["reply_page"] | 1, "refresh": syms["reply_refresh"] | 1} if kb_ttf else None,
+                        full_notifications=a.full_notifications)
     size = len(open(loader, "rb").read()); free = build_package.FREE_END - build_package.FREE_START; used = size + (16 + len(icon) + 15 if icon else 0)
     print("done:", a.out, "(%s replaces %s)" % ("hub of " + (", ".join(apps) or "installed apps") + (" + installable apps" if install else "") if hub else apps[0], sl["name"]))
     print("free flash: %d of %d bytes used (code and app icons %d, app-list icon %d), %d left" % (used, free, size, used - size, free - used))

@@ -11,6 +11,14 @@
 #include "kbd.c"                                                 /* the reply keyboard and the hook of the page of quick replies (build_firmware.py --reply-keyboard) */
 #endif
 
+#ifndef LAUNCHER
+#define LAUNCHER 0                                               /* 1 (build_firmware.py --launcher): the window's page is the launcher (launcher.c, drawn with ds.h) instead of the list */
+#endif
+#if LAUNCHER
+#include "ds.h"
+#define L_PINS 6                                                 /* favourites: two rows of three */
+#define L_TILES 48                                               /* 6 favourites + 12 built-in + 16 installed + 12 of the watch, and room */
+#endif
 #ifndef WINDOW_ID
 #define WINDOW_ID 0x2b                                           /* the window this build replaces (build_firmware.py --slot passes it); 0x2b = World clock */
 #endif
@@ -74,6 +82,15 @@ typedef struct {
     lv_obj_t *row[MAX_ROWS];
 #ifdef F3X_LOADER
     Inst *inst[F3X_SLOTS]; int ninst;
+#endif
+#if LAUNCHER
+    lv_obj_t *l_time, *l_date, *l_bat, *l_act; lv_timer_t *tm; u8 hr, hr_tick;           /* the status header and the timer that keeps it current */
+    char t_time[TXT_MAX], t_date[TXT_MAX], t_bat[TXT_MAX], t_act[TXT_MAX];
+    struct { lv_obj_t *o; u16 id; } tile[L_TILES]; int ntile;    /* every tile of the page and the item it stands for */
+    u16 pin[L_PINS];                                             /* the favourites: item id + 1, 0 = free; saved in L_CFG */
+    lv_obj_t *sheet, *b_pin, *b_rm, *l_rm, *b_cancel;            /* the sheet of a long press and its buttons */
+    u16 sel; u8 armed;
+#elif defined(F3X_LOADER)
     lv_obj_t *sheet, *b_rm, *l_rm, *b_cancel;                    /* the "Remove app?" sheet of a long press, and its buttons */
     int sel; u8 armed, lp;                                       /* the installed row it is about (index in row[]), "Sure?" shown, a long press was sent (the release must not open the app) */
 #endif
@@ -94,6 +111,9 @@ static void close_app(Win *w) {
     w->cur = 0; w->st = 0; w->root = 0; free_blk(w);             /* an installed app's code is freed only after its destroy has returned */
 }
 static void build_list(Win *w);
+#if LAUNCHER
+#include "launcher.c"                                            /* the launcher's page: build_list, page_back, page_free */
+#else
 #ifdef F3X_LOADER
 /* ---- removing an installed app: a long press on its row opens a sheet; "Remove" asks twice ("Sure?"), then the slot is overwritten with the tombstone the hub ignores ---- */
 static void close_sheet(Win *w) { if (w->sheet) { lv_obj_del(w->sheet); w->sheet = 0; } w->armed = 0; }
@@ -155,18 +175,24 @@ static void on_row(lv_event_t *e) {
 #endif
     }
 }
+#endif                                                           /* !LAUNCHER */
 static void on_screen(lv_event_t *e) {
     Win *w = (Win *)lv_event_get_user_data(e); u32 code = lv_event_get_code(e);
     if (code == EV_DELETE) {
         if (w->cur) w->cur->destroy(w->st);
         free_blk(w);
+#if LAUNCHER
+        page_free(w);
+#endif
 #ifdef F3X_LOADER
         for (int i = 0; i < w->ninst; i++) app_free(w->inst[i]);
 #endif
         app_free(w); return;
     }
     if (code == EV_GESTURE && lv_indev_get_gesture_dir(lv_indev_get_act()) == 2) {
-#ifdef F3X_LOADER
+#if LAUNCHER
+        if (page_back(w)) { ui_gesture_consume(); return; }
+#elif defined(F3X_LOADER)
         if (w->sheet) { close_sheet(w); ui_gesture_consume(); return; }       /* the sheet takes the back gesture first */
 #endif
         if (w->cur && w->cur->back(w->st)) { }                   /* the app used the gesture */
@@ -175,6 +201,7 @@ static void on_screen(lv_event_t *e) {
         ui_gesture_consume();
     }
 }
+#if !LAUNCHER
 static void add_row(Win *w, int i, const char *name, const Icon *icon) {
     lv_obj_t *r = w->row[i] = mk_box(w->list, 1, 6 + i * (ROW_H + ROW_GAP), 254, ROW_H, 26, C_CARD);
     lv_obj_add_event_cb(r, on_row, 0, w);
@@ -203,8 +230,10 @@ static void build_list(Win *w) {
         mk_text(l, 14, 140, 228, FT_SMALL, C_MUTED, ALIGN_CENTER, "Add apps from a PC");
     }
 #endif
+    (void)n;  /* only read with F3X_LOADER (the hint below); without it the count is not needed */
     lv_obj_scroll_to_y(l, 0, 0);
 }
+#endif                                                           /* !LAUNCHER */
 
 #if HOST_MODE
 /* ---- the app window: a window record of our own in the RAM table (id HOST_ID), filled when the hub opens ---- */
@@ -222,7 +251,7 @@ static lv_obj_t *host_create(u32 param) {
     else if (param >= 0x100 && param < 0x100 + F3X_SLOTS) w->blk = inst_load((int)(param - 0x100), &a);
 #endif
     if (a) open_app(w, a);
-    if (!w->cur) { free_blk(w); mk_text(scr, 14, 150, 228, FT_BTN, C_WHITE, ALIGN_CENTER, "Cannot open this app"); }
+    if (!w->cur) { free_blk(w); mk_text(scr, 14, 150, 228, FT_BTN, C_WHITE, ALIGN_CENTER, LAUNCHER ? "No se pudo abrir la app" : "Cannot open this app"); }
     lv_obj_add_event_cb(scr, on_screen, 0, w);
     return scr;
 }
@@ -247,14 +276,23 @@ __attribute__((section(".text.entry"))) lv_obj_t *world_create(u32 param, u32 pa
     *(void **)((u8 *)scr + 0x10) = w;                            /* lv_obj_t.user_data */
     lv_obj_clear_flag(scr, FL_SCROLLABLE); set_bg_color(scr, C_BLACK); set_bg_opa(scr, 255);
     if (HUB_MODE) {
+#if LAUNCHER
+        lv_obj_t *l = w->list = lv_obj_create(scr);              /* the launcher's page is the whole screen: the header scrolls away with the tiles */
+        lv_obj_set_size(l, SCREEN_W, SCREEN_H); lv_obj_set_pos(l, 0, 0);
+        page_load(w);
+#else
         mk_text(scr, 0, 8, SCREEN_W, FT_NAME, C_WHITE, ALIGN_CENTER, "Applications");
         lv_obj_t *l = w->list = lv_obj_create(scr);
         lv_obj_set_size(l, SCREEN_W, SCREEN_H - 50); lv_obj_set_pos(l, 0, 50);
+#endif
         set_bg_opa(l, 0); set_border_width(l, 0); set_radius(l, 0); set_pad_all(l, 0); lv_obj_set_scrollbar_mode(l, 0);
 #ifdef F3X_LOADER
         mkdir_p(HUB_DIR);                                        /* the directory the installer writes into; created on the first visit */
 #endif
         build_list(w);
+#if LAUNCHER
+        w->tm = lv_timer_create(on_home_timer, 1000, w);
+#endif
 #if HOST_MODE
         host_register();
 #endif
@@ -272,7 +310,7 @@ __attribute__((section(".text.entry"))) lv_obj_t *world_create(u32 param, u32 pa
 static u32 win_event(u32 id, u32 cls, u32 kind) {
     if (cls == 0 && kind == 0) {
         wm_set_current((u16)id);
-#if HOST_MODE
+#if HOST_MODE || LAUNCHER
         lv_obj_t *s = *(lv_obj_t **)(0x200fb4e4u + id * 0x30u + 0x10);                 /* the window entered (again): taps count again, whether or not the manager kept our screen */
         if (s) { Win *w = *(Win **)((u8 *)s + 0x10); if (w) w->busy = 0; }
 #endif

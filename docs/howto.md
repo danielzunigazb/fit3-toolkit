@@ -22,7 +22,7 @@ python3 -I src/build_firmware.py stock-aza3.bin out.bin --app tennis            
 ```
 
 Options: `--label "..."` (the name in the app list; more than 11 characters wraps onto two lines), `--slot` (see below), `--languages all` (rename the entry in every language file; untested outside English),
-`--no-icon`, `--no-install` (a hub without the loader of `.f3x` apps), `--no-native-transitions` (apps open inside the hub's window, without the slide: the fallback), `--no-bluetooth-patches` (see section 4).
+`--no-icon`, `--no-install` (a hub without the loader of `.f3x` apps), `--no-native-transitions` (apps open inside the hub's window, without the slide: the fallback), `--full-notifications` (keep the complete notification body and let the stock detail page scroll instead of replacing text after 11 lines with an ellipsis), `--no-bluetooth-patches` (see section 4).
 The build compiles the watch code, draws the icons, patches your stock package, repairs every checksum, runs `validate_fwd.py` on the result and prints how much of the free flash it used. It refuses a stock
 package that is not exactly R390XXU0AZA3. To see what changed: `python3 -I src/firmware/fwx.py list out.bin`.
 
